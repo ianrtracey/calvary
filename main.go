@@ -1,11 +1,13 @@
 package main
 
 import (
+	"encoding/base64"
 	"fmt"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/lambda"
 	"github.com/urfave/cli"
+	"io/ioutil"
 	"os"
 )
 
@@ -63,6 +65,39 @@ func main() {
 				}
 				payload := string(invokeResp.Payload[:])
 				fmt.Println(payload)
+				return nil
+			},
+		},
+		{
+			Name:    "create",
+			Aliases: []string{"c"},
+			Usage:   "create a function",
+			Action: func(c *cli.Context) error {
+				fmt.Println("create")
+				fileContents, err := ioutil.ReadFile("./testNode.zip")
+				if err != nil {
+					fmt.Println(err)
+					return nil
+				}
+
+				encodedFileContents := base64.StdEncoding.EncodeToString([]byte(fileContents))
+				fmt.Println(encodedFileContents)
+				params := &lambda.CreateFunctionInput{
+					Code: &lambda.FunctionCode{
+						ZipFile: []byte(fileContents),
+					},
+					FunctionName: aws.String(functionName),
+					Handler:      aws.String("testNode.handler"),
+					Role:         aws.String("arn:aws:iam::259931312128:role/lambda"),
+					Runtime:      aws.String("nodejs6.10"),
+					Description:  aws.String("a function that does something cool"),
+				}
+				resp, err := service.CreateFunction(params)
+				if err != nil {
+					fmt.Println(err.Error())
+					return nil
+				}
+				fmt.Println(resp)
 				return nil
 			},
 		},
