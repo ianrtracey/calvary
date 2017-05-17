@@ -1,14 +1,17 @@
 package main
 
 import (
-	"encoding/base64"
+	"errors"
 	"fmt"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/lambda"
+	"github.com/ianrtracey/calvary/deployment"
 	"github.com/urfave/cli"
 	"io/ioutil"
 	"os"
+	"path/filepath"
+	"strings"
 )
 
 func main() {
@@ -22,11 +25,17 @@ func main() {
 	app.Usage = "Your team's cli"
 
 	var functionName string
+	var fileName string
 	app.Flags = []cli.Flag{
 		cli.StringFlag{
 			Name:        "name",
 			Usage:       "function name",
 			Destination: &functionName,
+		},
+		cli.StringFlag{
+			Name:        "file",
+			Usage:       "file name to upload",
+			Destination: &fileName,
 		},
 	}
 
@@ -53,7 +62,6 @@ func main() {
 			Aliases: []string{"i"},
 			Usage:   "invokes a function",
 			Action: func(c *cli.Context) error {
-				fmt.Println(functionName)
 				invokeParams := &lambda.InvokeInput{
 					FunctionName: aws.String(functionName),
 					Payload:      []byte(nil),
@@ -73,21 +81,27 @@ func main() {
 			Aliases: []string{"c"},
 			Usage:   "create a function",
 			Action: func(c *cli.Context) error {
-				fmt.Println("create")
-				fileContents, err := ioutil.ReadFile("./testNode.zip")
+				if len(fileName) <= 0 {
+					fmt.Println("create: file required")
+					return nil
+				}
+				if len(functionName) <= 0 {
+					fmt.Println("create: functionName required")
+					return nil
+				}
+				fileContents, err := ioutil.ReadFile(fileName)
 				if err != nil {
 					fmt.Println(err)
 					return nil
 				}
 
-				encodedFileContents := base64.StdEncoding.EncodeToString([]byte(fileContents))
-				fmt.Println(encodedFileContents)
+				functionHandlerFile := strings.Split(filepath.Base(fileName), ".")[0]
 				params := &lambda.CreateFunctionInput{
 					Code: &lambda.FunctionCode{
 						ZipFile: []byte(fileContents),
 					},
 					FunctionName: aws.String(functionName),
-					Handler:      aws.String("testNode.handler"),
+					Handler:      aws.String(fmt.Sprintf("%s.handler", functionHandlerFile)),
 					Role:         aws.String("arn:aws:iam::259931312128:role/lambda"),
 					Runtime:      aws.String("nodejs6.10"),
 					Description:  aws.String("a function that does something cool"),
@@ -98,6 +112,26 @@ func main() {
 					return nil
 				}
 				fmt.Println(resp)
+				return nil
+			},
+		},
+		{
+			Name:  "init",
+			Usage: "initialize a function file",
+			Action: func(c *cli.Context) error {
+				// not sure if this is the right way to handle this
+				if len(functionName) <= 0 {
+					fmt.Println("init: functionName required")
+					return errors.New("init: functionName required")
+				}
+				nodeScaffolding := deployment.GetNodeFunctionFileScaffolding()
+				file, err := os.Create(fmt.Sprintf("%s.js", functionName))
+				defer file.Close()
+				if err != nil {
+					fmt.Println("error creating file")
+					return nil
+				}
+				fmt.Fprintf(file, nodeScaffolding)
 				return nil
 			},
 		},
