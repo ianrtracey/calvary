@@ -7,6 +7,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/lambda"
 	"github.com/ianrtracey/calvary/deployment"
+	"github.com/ianrtracey/calvary/organization"
 	"github.com/urfave/cli"
 	"io/ioutil"
 	"os"
@@ -26,6 +27,9 @@ func main() {
 
 	var functionName string
 	var fileName string
+
+	var accountName string
+	var email string
 	app.Flags = []cli.Flag{
 		cli.StringFlag{
 			Name:        "name",
@@ -36,6 +40,16 @@ func main() {
 			Name:        "file",
 			Usage:       "file name to upload",
 			Destination: &fileName,
+		},
+		cli.StringFlag{
+			Name:        "accountName",
+			Usage:       "name of account being added",
+			Destination: &accountName,
+		},
+		cli.StringFlag{
+			Name:        "email",
+			Usage:       "email f account being added",
+			Destination: &email,
 		},
 	}
 
@@ -133,6 +147,38 @@ func main() {
 				}
 				fmt.Fprintf(file, nodeScaffolding)
 				return nil
+			},
+		},
+		{
+			Name:    "organization",
+			Aliases: []string{"org"},
+			Usage:   "your team's organization logic",
+			Subcommands: []cli.Command{
+				{
+					Name:  "create",
+					Usage: "Creates a new organization",
+					Action: func(c *cli.Context) error {
+						fmt.Println("create a new organization...")
+						fmt.Println(organization.Create())
+						return nil
+					},
+				},
+				{
+					Name:  "invite",
+					Usage: "invites user to account",
+					Action: func(c *cli.Context) error {
+						if len(accountName) <= 0 {
+							fmt.Println("accountName required")
+							return nil
+						}
+						if len(email) <= 0 {
+							fmt.Println("email required")
+							return nil
+						}
+						organization.Invite(accountName, email)
+						return nil
+					},
+				},
 			},
 		},
 	}
